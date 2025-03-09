@@ -9,7 +9,7 @@ import java.io.IOException;
  * @data 2025/3/8 09:51
  * @since 1.0
 */
-public interface Producer {
+public interface MqProducer {
     /**
      * 发送
      * @param topic 主题

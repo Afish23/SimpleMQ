@@ -1,11 +1,11 @@
 package org.noear.simplemq.client;
 
-import org.noear.simplemq.Constants;
+import org.noear.simplemq.MqConstants;
 import org.noear.socketd.SocketD;
 import org.noear.socketd.transport.core.Message;
 import org.noear.socketd.transport.core.Session;
 import org.noear.socketd.transport.core.entity.StringEntity;
-import org.noear.socketd.transport.core.listener.SimpleListener;
+import org.noear.socketd.transport.core.listener.BuilderListener;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -17,18 +17,23 @@ import java.util.Map;
  * @data 2025/3/8 09:57
  * @since 1.0
  */
-public class ClientImpl extends SimpleListener implements Client {
+public class MqClientImpl extends BuilderListener implements MqClient {
 
     private String serverUrl;
     private Session session;
-    private Map<String, ConsumerHandler> subscribeMap = new HashMap<>();
+    private Map<String, MqConsumerHandler> subscribeMap = new HashMap<>();
 
-    public ClientImpl(String serverUrl) throws Exception {
+    public MqClientImpl(String serverUrl) throws Exception {
         this.serverUrl = serverUrl;
 
         this.session = SocketD.createClient(serverUrl)
                 .listen(this)
                 .open();
+
+        on(MqConstants.MQ_CMD_DISTRIBUTE, (s, m)->{
+            String topic = m.meta(MqConstants.MQ_TOPIC);
+            onDistribute(topic, m.dataAsString());
+        });
     }
 
     /**
@@ -38,9 +43,10 @@ public class ClientImpl extends SimpleListener implements Client {
      * @throws IOException
      */
     @Override
-    public void subscribe(String topic, ConsumerHandler handler) throws IOException {
+    public void subscribe(String topic, MqConsumerHandler handler) throws IOException {
+        //支持Qos1
         subscribeMap.put(topic, handler);
-        session.send(Constants.MQ_CMD_SUBSCRIBE, new StringEntity("").meta(Constants.MQ_TOPIC, topic));
+        session.send(MqConstants.MQ_CMD_SUBSCRIBE, new StringEntity("").meta(MqConstants.MQ_TOPIC, topic));
     }
 
     /**
@@ -51,21 +57,20 @@ public class ClientImpl extends SimpleListener implements Client {
      */
     @Override
     public void publish(String topic, String message) throws IOException {
-        session.send(Constants.MQ_CMD_PUBLISH, new StringEntity(message).meta(Constants.MQ_TOPIC, topic));
+        //支持Qos1
+        session.send(MqConstants.MQ_CMD_PUBLISH, new StringEntity(message).meta(MqConstants.MQ_TOPIC, topic));
     }
 
     /**
-     * 通知回来
-     * @param session
+     * 当派发时
+     * @param topic
      * @param message
      * @throws IOException
      */
-    @Override
-    public void onMessage(Session session, Message message) throws IOException {
-        String topic = message.meta(Constants.MQ_TOPIC);
-        ConsumerHandler handler = subscribeMap.get(topic);
+    private void onDistribute(String topic, String message) throws IOException {
+        MqConsumerHandler handler = subscribeMap.get(topic);
         if(handler != null) {
-            handler.handle(topic, message.dataAsString());
+            handler.handle(topic, message);
         }
     }
 }
