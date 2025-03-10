@@ -12,7 +12,7 @@ import org.noear.simplemq.client.MqClient;
 public class ClientDemo1 {
     public static void main(String[] args) throws Exception {
         //客户端
-        MqClient mqClient = new MqClientImpl("sd:tcp://127.0.0.1:9393");
+        MqClient mqClient = new MqClientImpl("SimpleMQ://127.0.0.1:9393?accessKey=root&accessSecretKey=123456");
         //订阅
         mqClient.subscribe("demo",((topic, message) -> {
             System.out.println("ClientDemo1::" + topic + " - " + message);

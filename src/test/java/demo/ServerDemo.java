@@ -10,7 +10,8 @@ import org.noear.simplemq.server.MqServerImpl;
  */
 public class ServerDemo {
     public static void main(String[] args) throws Exception {
-        MqServer server = new MqServerImpl();
-        server.start(9393);
+        MqServer server = new MqServerImpl()
+                .addAccess("root", "123456")
+                .start(9393);
     }
 }

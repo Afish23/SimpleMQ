@@ -7,6 +7,7 @@ import org.noear.socketd.transport.core.Session;
 import org.noear.socketd.transport.core.entity.StringEntity;
 import org.noear.socketd.transport.core.listener.BuilderListener;
 import org.noear.socketd.transport.server.Server;
+import org.noear.socketd.utils.IoConsumer;
 
 import java.io.IOException;
 import java.util.*;
@@ -19,9 +20,22 @@ import java.util.*;
 public class MqServerImpl extends BuilderListener implements MqServer {
     private Server server;
     private Map<String, Set<Session>> subscribeMap = new HashMap<>();
+    private Map<String, String> accessMap = new HashMap<>();
 
     @Override
-    public void start(int port) throws Exception {
+    public MqServer addAccess(String accessKey, String accessSecretKey) {
+        accessMap.put(accessKey, accessSecretKey);
+        return this;
+    }
+
+    @Override
+    public MqServer stop() {
+        server.stop();
+        return this;
+    }
+
+    @Override
+    public MqServer start(int port) throws Exception {
         server = SocketD.createServer("sd:tcp")
                 .config(c->c.port(port))
                 .listen(this)
@@ -48,6 +62,27 @@ public class MqServerImpl extends BuilderListener implements MqServer {
             String topic = m.meta(MqConstants.MQ_TOPIC);
             onPublish(topic, m);
         });
+        return this;
+    }
+
+    @Override
+    public void onOpen(Session session) throws IOException {
+        super.onOpen(session);
+
+        if(!accessMap.isEmpty()){
+            String accessKey = session.param(MqConstants.STR_ACCESS_KEY);
+            String accessSecretKey = session.param(MqConstants.STR_ACCESS_SECRET_KEY);
+
+            if(accessKey == null || accessSecretKey == null){
+                session.close();
+                return;
+            }
+
+            if(!accessSecretKey.equals(accessMap.get(accessKey))){
+                session.close();
+                return;
+            }
+        }
     }
 
     /**
@@ -82,8 +117,4 @@ public class MqServerImpl extends BuilderListener implements MqServer {
         }
     }
 
-    @Override
-    public void stop() {
-        server.stop();
-    }
 }

@@ -2,7 +2,6 @@ package org.noear.simplemq.client;
 
 import org.noear.simplemq.MqConstants;
 import org.noear.socketd.SocketD;
-import org.noear.socketd.transport.core.Message;
 import org.noear.socketd.transport.core.Session;
 import org.noear.socketd.transport.core.entity.StringEntity;
 import org.noear.socketd.transport.core.listener.BuilderListener;
@@ -10,6 +9,7 @@ import org.noear.socketd.transport.core.listener.BuilderListener;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 
 /**
@@ -24,9 +24,9 @@ public class MqClientImpl extends BuilderListener implements MqClient {
     private Map<String, MqConsumerHandler> subscribeMap = new HashMap<>();
 
     public MqClientImpl(String serverUrl) throws Exception {
-        this.serverUrl = serverUrl;
+        this.serverUrl = serverUrl.replace("SimpleMQ://", "sd:tcp://");
 
-        this.session = SocketD.createClient(serverUrl)
+        this.session = SocketD.createClient(this.serverUrl)
                 .listen(this)
                 .open();
 
@@ -43,10 +43,14 @@ public class MqClientImpl extends BuilderListener implements MqClient {
      * @throws IOException
      */
     @Override
-    public void subscribe(String topic, MqConsumerHandler handler) throws IOException {
+    public CompletableFuture<?> subscribe(String topic, MqConsumerHandler handler) throws IOException {
         //支持Qos1
         subscribeMap.put(topic, handler);
-        session.send(MqConstants.MQ_CMD_SUBSCRIBE, new StringEntity("").meta(MqConstants.MQ_TOPIC, topic));
+        CompletableFuture<?> future = new CompletableFuture<>();
+        session.sendAndSubscribe(MqConstants.MQ_CMD_SUBSCRIBE, new StringEntity("").meta(MqConstants.MQ_TOPIC, topic), (r)->{
+            future.complete(null);
+        });
+        return future;
     }
 
     /**
@@ -56,9 +60,13 @@ public class MqClientImpl extends BuilderListener implements MqClient {
      * @throws IOException
      */
     @Override
-    public void publish(String topic, String message) throws IOException {
+    public CompletableFuture<?> publish(String topic, String message) throws IOException {
         //支持Qos1
-        session.send(MqConstants.MQ_CMD_PUBLISH, new StringEntity(message).meta(MqConstants.MQ_TOPIC, topic));
+        CompletableFuture<?> future = new CompletableFuture<>();
+        session.sendAndSubscribe(MqConstants.MQ_CMD_PUBLISH, new StringEntity(message).meta(MqConstants.MQ_TOPIC, topic), (r)->{
+            future.complete(null);
+        });
+        return future;
     }
 
     /**
