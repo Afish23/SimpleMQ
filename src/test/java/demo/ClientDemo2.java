@@ -2,6 +2,7 @@ package demo;
 
 import org.noear.simplemq.client.MqClient;
 import org.noear.simplemq.client.MqClientImpl;
+import org.noear.simplemq.client.Subscription;
 
 
 /**
@@ -14,8 +15,8 @@ public class ClientDemo2 {
         //客户端
         MqClient mqClient = new MqClientImpl("SimpleMQ://127.0.0.1:9393?accessKey=root&accessSecretKey=123456");
         //订阅
-        mqClient.subscribe("demo",((topic, message) -> {
-            System.out.println("ClientDemo2::" + topic + " - " + message);
-        }));
+        mqClient.subscribe("demo", new Subscription("b", ((topic, message) -> {
+            System.out.println("ClientDemo1::" + topic + " - " + message);
+        })));
     }
 }
