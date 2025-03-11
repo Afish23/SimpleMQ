@@ -4,7 +4,7 @@ package org.noear.simplemq.client;
  *订阅者
  *
  * @author Afish
- * @data 2025/3/10 16:31
+ * @date 2025/3/10 16:31
  * @since 1.0
  */
 public class Subscription {

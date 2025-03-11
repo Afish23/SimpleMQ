@@ -7,7 +7,7 @@ import java.util.concurrent.CompletableFuture;
  * 生产者
  *
  * @author Afish
- * @data 2025/3/8 09:51
+ * @date 2025/3/8 09:51
  * @since 1.0
 */
 public interface MqProducer {

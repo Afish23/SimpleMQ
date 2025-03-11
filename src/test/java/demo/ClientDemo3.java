@@ -7,7 +7,7 @@ import org.noear.simplemq.client.Subscription;
 
 /**
  * @author Afish
- * @data 2025/3/8 10:35
+ * @date 2025/3/8 10:35
  * @since 1.0
  */
 public class ClientDemo3 {
@@ -17,6 +17,7 @@ public class ClientDemo3 {
         //订阅
         mqClient.subscribe("demo2", new Subscription("c", ((topic, message) -> {
             System.out.println("ClientDemo1::" + topic + " - " + message);
+            message.affirm(true);
         })));
     }
 }

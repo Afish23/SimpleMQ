@@ -5,7 +5,7 @@ import org.noear.simplemq.server.MqServerImpl;
 
 /**
  * @author Afish
- * @data 2025/3/9 09:54
+ * @date 2025/3/9 09:54
  * @since 1.0
  */
 public class ServerDemo {
