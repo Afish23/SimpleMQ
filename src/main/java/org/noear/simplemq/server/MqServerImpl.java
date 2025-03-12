@@ -10,7 +10,6 @@ import org.noear.socketd.transport.server.Server;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * @author Afish
@@ -21,6 +20,7 @@ public class MqServerImpl extends BuilderListener implements MqServer {
     private Server server;
     private Set<Session> sessionSet = new HashSet<>();
     private Map<String, Set<String>> subscribeMap = new HashMap<>();
+    private Map<String, MqMessageQueue> identityMap = new HashMap<>();
     private Map<String, String> accessMap = new HashMap<>();
 
     @Override
@@ -38,13 +38,13 @@ public class MqServerImpl extends BuilderListener implements MqServer {
     @Override
     public MqServer start(int port) throws Exception {
         server = SocketD.createServer("sd:tcp")
-                .config(c->c.port(port))
+                .config(c -> c.port(port))
                 .listen(this)
                 .start();
 
         //接受订阅指令
-        on(MqConstants.MQ_CMD_SUBSCRIBE, (s, m) ->{
-            if (m.isRequest() || m.isSubscribe()){
+        on(MqConstants.MQ_CMD_SUBSCRIBE, (s, m) -> {
+            if (m.isRequest() || m.isSubscribe()) {
                 //表示我收到了
                 s.replyEnd(m, new StringEntity(""));
             }
@@ -55,8 +55,8 @@ public class MqServerImpl extends BuilderListener implements MqServer {
         });
 
         //接受发布指令
-        on(MqConstants.MQ_CMD_PUBLISH, (s, m) ->{
-            if (m.isRequest() || m.isSubscribe()){
+        on(MqConstants.MQ_CMD_PUBLISH, (s, m) -> {
+            if (m.isRequest() || m.isSubscribe()) {
                 //表示我收到了
                 s.replyEnd(m, new StringEntity(""));
             }
@@ -71,16 +71,16 @@ public class MqServerImpl extends BuilderListener implements MqServer {
     public void onOpen(Session session) throws IOException {
         super.onOpen(session);
 
-        if(!accessMap.isEmpty()){
+        if (!accessMap.isEmpty()) {
             String accessKey = session.param(MqConstants.PARAM_ACCESS_KEY);
             String accessSecretKey = session.param(MqConstants.PARAM_ACCESS_SECRET_KEY);
 
-            if(accessKey == null || accessSecretKey == null){
+            if (accessKey == null || accessSecretKey == null) {
                 session.close();
                 return;
             }
 
-            if(!accessSecretKey.equals(accessMap.get(accessKey))){
+            if (!accessSecretKey.equals(accessMap.get(accessKey))) {
                 session.close();
                 return;
             }
@@ -95,6 +95,7 @@ public class MqServerImpl extends BuilderListener implements MqServer {
 
     /**
      * 当订阅时
+     *
      * @param topic
      * @param session
      */
@@ -102,40 +103,36 @@ public class MqServerImpl extends BuilderListener implements MqServer {
         //给会话添加身份（可以有多个不同身份）
         session.attr(identity, "1");
 
-        //以身份进行订阅
-        Set<String> identitys = subscribeMap.get(topic);
-        if (identitys == null) {
-            identitys = new HashSet<>();
-            subscribeMap.put(topic, identitys);
+        //以身份进行订阅（topic -> identity）
+        Set<String> identitySet = subscribeMap.get(topic);
+        if (identitySet == null) {
+            identitySet = new HashSet<>();
+            subscribeMap.put(topic, identitySet);
         }
-        identitys.add(identity);
+        identitySet.add(identity);
+
+        //为身份建立队列（identity -> queue）
+        if(!identityMap.containsKey(identity)) {
+            identityMap.put(identity, new MqMessageQueueImpl(identity, sessionSet));
+        }
     }
 
     /**
      * 当发布时
+     *
      * @param topic
      * @param message
      * @throws IOException
      */
     private synchronized void onPublish(String topic, Message message) throws IOException {
         //取出所有订阅的身份
-        Set<String> identitys = subscribeMap.get(topic);
-        if (identitys != null) {
-            for (String identity : identitys) {
-                //找到此身份的其中一个会话（如果是ip就一个；如果是集群名则任选一个）
-                List<Session> sessions = sessionSet.parallelStream()
-                        .filter(s -> s.attrMap().containsKey(identity))
-                        .collect(Collectors.toList());
-                if (!sessions.isEmpty()) {
-                    //随机取一个会话
-                    int idx = 0;
-                    if (sessions.size() > 1) {
-                        idx = new Random().nextInt(sessions.size());
-                    }
-                    Session s1 = sessions.get(idx);
-                    //给会话发消息
-                    s1.send(MqConstants.MQ_CMD_DISTRIBUTE, message);
-                    message.data().reset();
+        Set<String> identitySet = subscribeMap.get(topic);
+        if (identitySet != null) {
+            MqMessageHolder messageHolder = new MqMessageHolder(message);
+            for (String identity : identitySet) {
+                MqMessageQueue queue = identityMap.get(identity);
+                if (queue != null) {
+                    queue.add(messageHolder);
                 }
             }
         }
