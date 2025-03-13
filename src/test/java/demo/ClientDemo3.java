@@ -17,7 +17,6 @@ public class ClientDemo3 {
         //订阅
         mqClient.subscribe("demo2", new Subscription("c", ((topic, message) -> {
             System.out.println("ClientDemo1::" + topic + " - " + message);
-            message.affirm(true);
         })));
     }
 }

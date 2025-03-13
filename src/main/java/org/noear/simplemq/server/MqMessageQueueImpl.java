@@ -2,6 +2,7 @@ package org.noear.simplemq.server;
 
 import org.noear.simplemq.MqConstants;
 import org.noear.socketd.transport.core.Session;
+import org.noear.socketd.utils.RunUtils;
 
 import java.io.IOException;
 import java.util.*;
@@ -14,7 +15,6 @@ import java.util.stream.Collectors;
  */
 public class MqMessageQueueImpl implements MqMessageQueue {
     private Queue<MqMessageHolder> queue = new LinkedList<>();
-    private Queue<MqMessageHolder> delayedQueue = new LinkedList<>();
     private final String identity;
     private final Set<Session> sessionSet;
 
@@ -32,6 +32,15 @@ public class MqMessageQueueImpl implements MqMessageQueue {
     public void add(MqMessageHolder messageHolder) {
         queue.add(messageHolder);
         distribute();
+    }
+
+    public void addDelayed(MqMessageHolder messageHolder) {
+        if(messageHolder.deferredFuture != null) {
+            messageHolder.deferredFuture.cancel(true);
+        }
+        messageHolder.deferredFuture = RunUtils.delay(()->{
+            add(messageHolder);
+        }, messageHolder.getNextTime() - System.currentTimeMillis());
     }
 
     /**
@@ -53,7 +62,7 @@ public class MqMessageQueueImpl implements MqMessageQueue {
 
                 if (!MqNextTime.allowDistribute(messageHolder)) {
                     //进入延后队列
-                    delayedQueue.add(messageHolder);
+                    addDelayed(messageHolder);
                     continue;
                 }
 
@@ -61,7 +70,7 @@ public class MqMessageQueueImpl implements MqMessageQueue {
                     distributeDo(messageHolder, sessions);
                 } catch (Exception e) {
                     //进入延后队列
-                    delayedQueue.add(messageHolder.deferred());
+                    addDelayed(messageHolder.deferred());
                 }
             }
         }
@@ -83,15 +92,16 @@ public class MqMessageQueueImpl implements MqMessageQueue {
         Session s1 = sessions.get(idx);
 
         //todo:这里可能会有线程同步问题
-        messageHolder.getMessage().data().reset();
+        messageHolder.getContent().meta(MqConstants.MQ_TIMES, String.valueOf(messageHolder.getTimes()));
 
         //给会话发消息
-        s1.sendAndSubscribe(MqConstants.MQ_CMD_DISTRIBUTE, messageHolder.getMessage(), m -> {
+        s1.sendAndSubscribe(MqConstants.MQ_CMD_DISTRIBUTE, messageHolder.getContent(), m -> {
             int ack = Integer.parseInt(m.metaOrDefault(MqConstants.MQ_ACK, "0"));
             if (ack == 0) {
                 //进入延后队列，之后再试 //todo:如果因为网络原因，没有回调怎么办？
-                delayedQueue.add(messageHolder.deferred());
+                addDelayed(messageHolder.deferred());
             }
         });
     }
+
 }

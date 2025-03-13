@@ -15,20 +15,21 @@ import java.io.IOException;
  */
 public class MqMessageImpl implements MqMessage {
     private final MqClientInternal clientInternal;
-    private final Message message;
+    private final Message from;
+    private final String topic;
     private final String content;
     private final int times;
 
-    public MqMessageImpl(MqClientInternal mqClientInternal, Message message) {
+    public MqMessageImpl(MqClientInternal mqClientInternal, Message from) {
         this.clientInternal = mqClientInternal;
-        this.message = message;
-        this.content =message.dataAsString();
-        this.times = Integer.parseInt(message.metaOrDefault(MqConstants.MQ_TIMES, "0"));
+        this.from = from;
+        this.topic = from.metaOrDefault(MqConstants.MQ_TOPIC, "");
+        this.content = from.dataAsString();
+        this.times = Integer.parseInt(from.metaOrDefault(MqConstants.MQ_TIMES, "0"));
     }
 
-    @Override
-    public String getKey() {
-        return message.sid();
+    public String getTopic() {
+        return topic;
     }
 
     @Override
@@ -43,11 +44,15 @@ public class MqMessageImpl implements MqMessage {
 
     @Override
     public void affirm(boolean isOk) throws IOException {
-        clientInternal.affirm(message, isOk);
+        clientInternal.affirm(from, isOk);
     }
 
     @Override
     public String toString() {
-        return getContent();
+        return "MqMessage{" +
+                "content='" + content + '\'' +
+                ", times=" + times +
+                ", topic='" + topic + '\'' +
+                '}';
     }
 }

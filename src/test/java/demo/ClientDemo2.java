@@ -14,10 +14,18 @@ public class ClientDemo2 {
     public static void main(String[] args) throws Exception {
         //客户端
         MqClient mqClient = new MqClientImpl("SimpleMQ://127.0.0.1:9393?accessKey=root&accessSecretKey=123456")
-                .autoAck(true);
+                .autoAck(false);
         //订阅
         mqClient.subscribe("demo", new Subscription("b", ((topic, message) -> {
-            System.out.println("ClientDemo1::" + topic + " - " + message);
+
+            if (message.getTimes() < 2){
+                System.out.println("ClientDemo2-no::" + topic + " - " + message);
+                message.affirm(false);
+            }else {
+                System.out.println("ClientDemo2-ok::" + topic + " - " + message);
+                message.affirm(true);
+            }
+
         })));
     }
 }

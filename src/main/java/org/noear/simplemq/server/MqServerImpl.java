@@ -1,6 +1,7 @@
 package org.noear.simplemq.server;
 
 import org.noear.simplemq.MqConstants;
+import org.noear.simplemq.client.MqMessage;
 import org.noear.socketd.SocketD;
 import org.noear.socketd.transport.core.Message;
 import org.noear.socketd.transport.core.Session;
@@ -128,10 +129,10 @@ public class MqServerImpl extends BuilderListener implements MqServer {
         //取出所有订阅的身份
         Set<String> identitySet = subscribeMap.get(topic);
         if (identitySet != null) {
-            MqMessageHolder messageHolder = new MqMessageHolder(message);
             for (String identity : identitySet) {
                 MqMessageQueue queue = identityMap.get(identity);
                 if (queue != null) {
+                    MqMessageHolder messageHolder = new MqMessageHolder(message);
                     queue.add(messageHolder);
                 }
             }

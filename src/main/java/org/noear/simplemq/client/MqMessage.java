@@ -10,11 +10,6 @@ import java.io.IOException;
  * @since 1.0
  */
 public interface MqMessage {
-    /**
-     * 消息键
-     * @return
-     */
-    String getKey();
 
     /**
      * 消息内容
