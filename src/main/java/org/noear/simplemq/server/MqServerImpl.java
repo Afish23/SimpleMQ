@@ -1,7 +1,6 @@
 package org.noear.simplemq.server;
 
 import org.noear.simplemq.MqConstants;
-import org.noear.simplemq.client.MqMessage;
 import org.noear.socketd.SocketD;
 import org.noear.socketd.transport.core.Message;
 import org.noear.socketd.transport.core.Session;
@@ -19,7 +18,6 @@ import java.util.*;
  */
 public class MqServerImpl extends BuilderListener implements MqServer {
     private Server server;
-    private Set<Session> sessionSet = new HashSet<>();
     private Map<String, Set<String>> subscribeMap = new HashMap<>();
     private Map<String, MqMessageQueue> identityMap = new HashMap<>();
     private Map<String, String> accessMap = new HashMap<>();
@@ -86,12 +84,18 @@ public class MqServerImpl extends BuilderListener implements MqServer {
                 return;
             }
         }
-        sessionSet.add(session);
     }
 
     @Override
     public void onClose(Session session) {
-        sessionSet.remove(session);
+        //遍历这个会话的身份记录（有些可能不是）
+       for (String identity :  session.attrMap().keySet()){
+           MqMessageQueue mqMessageQueue = identityMap.get(identity);
+           //如果找到对应的队列
+           if (mqMessageQueue != null) {
+               mqMessageQueue.removeSubscriber(session);
+           }
+       }
     }
 
     /**
@@ -114,7 +118,9 @@ public class MqServerImpl extends BuilderListener implements MqServer {
 
         //为身份建立队列（identity -> queue）
         if(!identityMap.containsKey(identity)) {
-            identityMap.put(identity, new MqMessageQueueImpl(identity, sessionSet));
+            MqMessageQueue mqMessageQueue = new MqMessageQueueImpl(identity);
+            mqMessageQueue.addSubscriber(session);
+            identityMap.put(identity, mqMessageQueue);
         }
     }
 
@@ -133,7 +139,7 @@ public class MqServerImpl extends BuilderListener implements MqServer {
                 MqMessageQueue queue = identityMap.get(identity);
                 if (queue != null) {
                     MqMessageHolder messageHolder = new MqMessageHolder(message);
-                    queue.add(messageHolder);
+                    queue.push(messageHolder);
                 }
             }
         }
